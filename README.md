@@ -26,7 +26,7 @@ From the repository root, run:
 rokit install
 ```
 
-Rokit asks you to trust `rojo-rbx/rojo`, `Kampfkarren/selene`, `JohnnyMorganz/stylua`, and `JohnnyMorganz/luau-lsp`. Trust them. The versions are the lines in `rokit.toml`. Rojo stays on 7.6.1. Rojo 7.7.0 stops detecting new files after `rojo serve` starts. The open report is [rojo-rbx/rojo#1300](https://github.com/rojo-rbx/rojo/issues/1300).
+Rokit asks you to trust `rojo-rbx/rojo`, `Kampfkarren/selene`, and `JohnnyMorganz/stylua`. Trust them. The versions are the lines in `rokit.toml`. Rojo stays on 7.6.1. Rojo 7.7.0 stops detecting new files after `rojo serve` starts. The open report is [rojo-rbx/rojo#1300](https://github.com/rojo-rbx/rojo/issues/1300).
 
 ## Install the Studio plugin
 
