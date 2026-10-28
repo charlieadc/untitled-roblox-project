@@ -2,6 +2,9 @@ name: ci
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -11,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install tools
-        uses: CompeyDev/setup-rokit@v0.2.1
+        uses: CompeyDev/setup-rokit@1d9390883f7ebce19d48f5b8d006e11d387c92ab # v0.2.1
         with:
           version: v1.2.0
 
@@ -23,3 +26,6 @@ jobs:
 
       - name: Format
         run: stylua --check src
+
+      - name: Build
+        run: rojo build -o test.rbxl

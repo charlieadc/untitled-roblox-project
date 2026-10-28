@@ -50,9 +50,7 @@ From the repository root, run:
 rojo serve
 ```
 
-The server listens on `localhost` port `34872`. Connect the plugin to that server. Studio must be in Edit mode. Stop the playtest before you sync again.
-
-If a second `rojo serve` exits with `Address already in use`, the first server is still running. Use that one.
+Connect the plugin to that server.
 
 To write a place file instead, run:
 
@@ -65,16 +63,3 @@ Git ignores `test.rbxl`.
 ## Turn on Studio MCP
 
 In Studio, open **Assistant**, then **Manage MCP Servers**, then **Enable Studio as MCP server**. Then choose **Quick connect** for your AI client.
-
-Read `AGENTS.md` before you edit scripts.
-
-## Check before a pull request
-
-From the repository root, run:
-
-```sh
-selene src
-stylua --check src
-```
-
-Both commands exit 0. CI runs the same two commands on pull requests.
