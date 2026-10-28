@@ -21,4 +21,5 @@ From the repository root, run these commands before each pull request.
 ```sh
 selene src
 stylua --check src
+rojo build -o test.rbxl
 ```
