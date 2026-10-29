@@ -14,6 +14,7 @@ local rig: Model? = nil
 local cfg = nil
 local sway = nil
 local aimSpring = nil
+local sprintSpring = nil
 local character: Model? = nil
 local diedConnection: RBXScriptConnection? = nil
 local bobTime = 0
@@ -25,6 +26,7 @@ local recoilState = nil
 local mouseHeld = false
 local pressEdge = false
 local aimWasHeld = false
+local wasSprinting = false
 
 local function partNamed(model: Model, name: string): BasePart?
 	for _, desc in ipairs(model:GetDescendants()) do
@@ -146,6 +148,7 @@ end
 local function equip(gunName: string)
 	mouseHeld = false
 	aimWasHeld = false
+	wasSprinting = false
 	pressEdge = false
 	settleRecoil()
 	destroyRig()
@@ -154,6 +157,7 @@ local function equip(gunName: string)
 	rig.Parent = workspace.CurrentCamera
 	sway = Spring.new(Vector3.zero, cfg.Sway.Speed, cfg.Sway.Damper)
 	aimSpring = Spring.new(Vector3.zero, cfg.AdsSpeed, 1)
+	sprintSpring = Spring.new(Vector3.zero, 10, 1)
 	recoilState = newRecoil(cfg.Recoil)
 	bobTime = 0
 	lastRotation = nil
@@ -175,6 +179,7 @@ local function update(dt: number)
 		or cfg == nil
 		or sway == nil
 		or aimSpring == nil
+		or sprintSpring == nil
 		or cam == nil
 		or character == nil
 		or recoilState == nil
@@ -190,17 +195,35 @@ local function update(dt: number)
 		mouseHeld = false
 	end
 	local trigger = pressEdge or mouseHeld
+	local shift = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+	local moving = humanoid ~= nil and humanoid.MoveDirection.Magnitude > 0
+	local sprinting = shift and moving and not held and not trigger
+	if humanoid ~= nil then
+		humanoid.WalkSpeed = if sprinting then cfg.SprintSpeed else cfg.WalkSpeed
+	end
 	local speed = 0
 	if root ~= nil and root:IsA("BasePart") and humanoid ~= nil and humanoid.WalkSpeed ~= 0 then
 		speed = root.AssemblyLinearVelocity.Magnitude / humanoid.WalkSpeed
 	end
+	local sprintClip = false
 	if anims ~= nil then
-		-- TODO: read #32's sprint state once both branches are on main. Do not write WalkSpeed.
-		if speed > 0 and not held then
+		if sprinting and not wasSprinting then
+			anims:play("SprintIn")
+		elseif not sprinting and wasSprinting then
+			anims:stop("Sprint", 0.1)
+			anims:play("SprintOut")
+		end
+		if sprinting then
+			anims:play("Sprint")
+			anims:stop("Walk")
+		elseif speed > 0 and not held then
 			anims:play("Walk")
 		else
 			anims:stop("Walk")
 		end
+		sprintClip = anims:isPlaying("Sprint")
+		wasSprinting = sprinting
 	end
 	bobTime += dt * cfg.Bob.Speed
 	if anims ~= nil and held ~= aimWasHeld then
@@ -214,7 +237,10 @@ local function update(dt: number)
 	aimSpring:setTarget(if held then Vector3.xAxis else Vector3.zero)
 	local a = aimSpring:update(dt).X
 	local aimScale = 1 - 0.8 * a
-	local bobCF = CFrame.new(Vector3.yAxis * math.sin(bobTime) * cfg.Bob.Amount * speed * aimScale)
+	sprintSpring:setTarget(if sprinting and not sprintClip then Vector3.xAxis else Vector3.zero)
+	local s = sprintSpring:update(dt).X
+	local bobMult = if sprinting then cfg.Bob.SprintMult else 1
+	local bobCF = CFrame.new(Vector3.yAxis * math.sin(bobTime) * cfg.Bob.Amount * bobMult * speed * aimScale)
 
 	local rotation = cam.CFrame.Rotation
 	if lastRotation ~= nil then
@@ -228,7 +254,7 @@ local function update(dt: number)
 	local offset = sway:update(dt)
 	local swayCF = CFrame.fromOrientation(offset.X * aimScale, offset.Y * aimScale, offset.Z * aimScale)
 
-	local hipCF = bobCF * swayCF * cfg.HipOffset
+	local hipCF = bobCF * swayCF * cfg.HipOffset:Lerp(cfg.SprintOffset, if sprintClip then 0 else s)
 	local hrp = rig:FindFirstChild("HumanoidRootPart") :: BasePart
 	local sight = ViewmodelRig.sightCFrame(rig)
 	local aimCF = (hrp.CFrame:ToObjectSpace(sight) * cfg.AimOffset):Inverse()
@@ -257,11 +283,13 @@ local function onDied()
 	destroyRig()
 	sway = nil
 	aimSpring = nil
+	sprintSpring = nil
 	cfg = nil
 	character = nil
 	lastRotation = nil
 	mouseHeld = false
 	aimWasHeld = false
+	wasSprinting = false
 	pressEdge = false
 end
 
