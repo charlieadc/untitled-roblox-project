@@ -224,6 +224,12 @@ function ViewmodelRig.validate(rig: Model): (boolean, string?)
 	if gripMotor == nil or not gripMotor:IsA("Motor6D") or gripMotor.Part0 ~= right or gripMotor.Part1 ~= grip then
 		return false, "Grip motor is missing"
 	end
+	local joined = {}
+	for _, joint in ipairs(grip:GetChildren()) do
+		if joint:IsA("WeldConstraint") or joint:IsA("Motor6D") then
+			joined[joint.Part1] = true
+		end
+	end
 	for _, desc in ipairs(rig:GetDescendants()) do
 		if desc:IsA("LuaSourceContainer") then
 			return false, `{desc.Name} is a script`
@@ -231,7 +237,7 @@ function ViewmodelRig.validate(rig: Model): (boolean, string?)
 		if desc:IsA("BasePart") and desc ~= hrp and desc.Anchored then
 			return false, `{desc.Name} is anchored`
 		end
-		if desc:IsA("BasePart") and desc.Parent == gun and desc ~= grip and grip:FindFirstChild(desc.Name) == nil then
+		if desc:IsA("BasePart") and desc.Parent == gun and desc ~= grip and not joined[desc] then
 			return false, `{desc.Name} is not joined to Grip`
 		end
 	end
