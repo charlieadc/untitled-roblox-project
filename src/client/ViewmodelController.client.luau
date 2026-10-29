@@ -25,7 +25,6 @@ local recoilState = nil
 local mouseHeld = false
 local pressEdge = false
 local aimWasHeld = false
-local wasSprinting = false
 
 local function partNamed(model: Model, name: string): BasePart?
 	for _, desc in ipairs(model:GetDescendants()) do
@@ -147,7 +146,6 @@ end
 local function equip(gunName: string)
 	mouseHeld = false
 	aimWasHeld = false
-	wasSprinting = false
 	pressEdge = false
 	settleRecoil()
 	destroyRig()
@@ -192,30 +190,17 @@ local function update(dt: number)
 		mouseHeld = false
 	end
 	local trigger = pressEdge or mouseHeld
-	local shift = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
-		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
-	local moving = humanoid ~= nil and humanoid.MoveDirection.Magnitude > 0
-	local sprinting = shift and moving and not held and not trigger
 	local speed = 0
 	if root ~= nil and root:IsA("BasePart") and humanoid ~= nil and humanoid.WalkSpeed ~= 0 then
 		speed = root.AssemblyLinearVelocity.Magnitude / humanoid.WalkSpeed
 	end
 	if anims ~= nil then
-		if sprinting and not wasSprinting then
-			anims:play("SprintIn")
-		elseif not sprinting and wasSprinting then
-			anims:stop("Sprint", 0.1)
-			anims:play("SprintOut")
-		end
-		if sprinting then
-			anims:play("Sprint")
-			anims:stop("Walk")
-		elseif speed > 0 and not held then
+		-- TODO: read #32's sprint state once both branches are on main. Do not write WalkSpeed.
+		if speed > 0 and not held then
 			anims:play("Walk")
 		else
 			anims:stop("Walk")
 		end
-		wasSprinting = sprinting
 	end
 	bobTime += dt * cfg.Bob.Speed
 	if anims ~= nil and held ~= aimWasHeld then
@@ -277,7 +262,6 @@ local function onDied()
 	lastRotation = nil
 	mouseHeld = false
 	aimWasHeld = false
-	wasSprinting = false
 	pressEdge = false
 end
 
@@ -308,7 +292,7 @@ local function onInput(input: InputObject, processed: boolean)
 		end
 		return
 	end
-	if processed or not RunService:IsStudio() or anims == nil or rig == nil or cfg == nil then
+	if processed or anims == nil or rig == nil or cfg == nil then
 		return
 	end
 	if input.KeyCode == Enum.KeyCode.R then
@@ -321,7 +305,12 @@ local function onInput(input: InputObject, processed: boolean)
 				playSound(grip, name)
 			end
 		end
-	elseif input.KeyCode == Enum.KeyCode.T then
+		return
+	end
+	if not RunService:IsStudio() then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.T then
 		if not anims:isPlaying("ReloadEmpty") then
 			anims:play("ReloadEmpty")
 		end
