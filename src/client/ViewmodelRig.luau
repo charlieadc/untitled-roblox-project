@@ -23,10 +23,6 @@ local function makeBlock(name: string, at: CFrame): Part
 	block.Size = Vector3.new(1, 1, 1)
 	block.CFrame = at
 	block.Anchored = false
-	block.CanCollide = false
-	block.CanQuery = false
-	block.CanTouch = false
-	block.Massless = true
 	return block
 end
 local function findTemplate(folderName: string, modelName: string): Model?
@@ -93,7 +89,6 @@ local function ensureArms(missing: { string }): Model
 	local hrp, createdRoot = slot(rig, "HumanoidRootPart", CFrame.identity, report)
 	if createdRoot then
 		hrp.Anchored = true
-		hrp.CanCollide = false
 		hrp.Transparency = 1
 	end
 	if rig.PrimaryPart == nil then
@@ -194,9 +189,6 @@ local function motorProblem(partParent: Instance, motorParent: Instance, name: s
 	local part = childPart(partParent, name)
 	if part == nil then
 		return `{name} is missing`
-	end
-	if part.CanCollide or part.CanQuery or part.CanTouch then
-		return `{name} must ignore collision`
 	end
 	local joint = motorParent:FindFirstChild(name)
 	if joint == nil or not joint:IsA("Motor6D") or joint.Part0 ~= part0 or joint.Part1 ~= part then
