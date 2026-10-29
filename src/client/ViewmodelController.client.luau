@@ -127,7 +127,7 @@ local function update(dt: number)
 	local offset = sway:update(dt)
 	local swayCF = CFrame.fromOrientation(offset.X * aimScale, offset.Y * aimScale, offset.Z * aimScale)
 
-	local hipCF = bobCF * swayCF
+	local hipCF = bobCF * swayCF * cfg.HipOffset
 	local hrp = rig:FindFirstChild("HumanoidRootPart") :: BasePart
 	local sight = ViewmodelRig.sightCFrame(rig)
 	local aimCF = (hrp.CFrame:ToObjectSpace(sight) * cfg.AimOffset):Inverse()

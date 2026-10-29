@@ -2,7 +2,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GunConfig = require(ReplicatedStorage:WaitForChild("GunConfig"))
 local ViewmodelRig = {}
 local ARM_OFFSET = {
-	LeftArm = CFrame.new(-1.5, 0, 0),
+	LeftArm = CFrame.new(1.5, 0, 0) * CFrame.new(-0.3, 0.05, -0.45),
 	RightArm = CFrame.new(1.5, 0, 0),
 }
 local GUN_PARTS = {
