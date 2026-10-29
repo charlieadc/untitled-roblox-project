@@ -1,7 +1,5 @@
 # Agents
 
-Write all code on disk under `src`.
-
 Edit Luau on disk under `src`. Then push the script into Studio with Studio MCP. Never hand-edit a script in Studio. Disk is the source of truth.
 
 Map each folder to a service.
