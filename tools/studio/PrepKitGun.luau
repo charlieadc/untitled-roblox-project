@@ -10,19 +10,6 @@ local function countEffects(root: Instance): (number, number)
 	end
 	return sounds, emitters
 end
-
-local function destroyOfClass(root: Instance, className: string)
-	local doomed = {}
-	for _, desc in ipairs(root:GetDescendants()) do
-		if desc:IsA(className) then
-			table.insert(doomed, desc)
-		end
-	end
-	for _, desc in ipairs(doomed) do
-		desc:Destroy()
-	end
-end
-
 local function prepKitGun(toolName: string): Model
 	local replicatedStorage = game:GetService("ReplicatedStorage")
 	local studioWorkspace = game:GetService("Workspace")
@@ -30,35 +17,21 @@ local function prepKitGun(toolName: string): Model
 	if tool == nil or not tool:IsA("Tool") then
 		error(`PrepKitGun: Workspace.{toolName} Tool is missing`)
 	end
-
 	local soundsBefore, emittersBefore = countEffects(tool)
 	local clone = tool:Clone()
 	local model = Instance.new("Model")
 	model.Name = toolName
-
-	local parts = {}
 	for _, desc in ipairs(clone:GetDescendants()) do
 		if desc:IsA("BasePart") then
-			table.insert(parts, desc)
+			desc.Parent = model
 		end
 	end
-	for _, part in ipairs(parts) do
-		part.Parent = model
-	end
 	clone:Destroy()
-
-	destroyOfClass(model, "LuaSourceContainer")
-	destroyOfClass(model, "RemoteEvent")
-	destroyOfClass(model, "RemoteFunction")
-	destroyOfClass(model, "JointInstance")
-	destroyOfClass(model, "WeldConstraint")
-
 	local grip = model:FindFirstChild("Grip")
 	if grip == nil or not grip:IsA("BasePart") then
 		error(`PrepKitGun: {toolName} has no Grip part`)
 	end
 	model.PrimaryPart = grip
-
 	for _, desc in ipairs(model:GetDescendants()) do
 		if desc:IsA("BasePart") then
 			desc.Anchored = false
@@ -66,29 +39,28 @@ local function prepKitGun(toolName: string): Model
 			desc.CanQuery = false
 			desc.CanTouch = false
 			desc.Massless = true
-		end
-	end
-
-	for _, child in ipairs(model:GetChildren()) do
-		if child:IsA("BasePart") and child ~= grip then
-			if child.Name == "Mag" or child.Name == "Bolt" then
-				local motor = Instance.new("Motor6D")
-				motor.Name = child.Name
-				motor.Part0 = grip
-				motor.Part1 = child
-				motor.C0 = grip.CFrame:ToObjectSpace(child.CFrame)
-				motor.C1 = CFrame.identity
-				motor.Parent = grip
-			else
-				local weld = Instance.new("WeldConstraint")
-				weld.Name = child.Name
-				weld.Part0 = grip
-				weld.Part1 = child
-				weld.Parent = grip
+			if desc ~= grip then
+				local joint =
+					Instance.new(if desc.Name == "Mag" or desc.Name == "Bolt" then "Motor6D" else "WeldConstraint")
+				joint.Name = desc.Name
+				joint.Part0 = grip
+				joint.Part1 = desc
+				if joint:IsA("Motor6D") then
+					joint.C0 = grip.CFrame:ToObjectSpace(desc.CFrame)
+					joint.C1 = CFrame.identity
+				end
+				joint.Parent = grip
 			end
+		elseif
+			desc:IsA("LuaSourceContainer")
+			or desc:IsA("RemoteEvent")
+			or desc:IsA("RemoteFunction")
+			or desc:IsA("JointInstance")
+			or desc:IsA("WeldConstraint")
+		then
+			desc:Destroy()
 		end
 	end
-
 	local gunModels = replicatedStorage:FindFirstChild("GunModels")
 	if gunModels == nil then
 		gunModels = Instance.new("Folder")
@@ -100,10 +72,8 @@ local function prepKitGun(toolName: string): Model
 		existing:Destroy()
 	end
 	model.Parent = gunModels
-
 	local soundsAfter, emittersAfter = countEffects(model)
 	print(`PrepKitGun: {toolName} sounds {soundsBefore} -> {soundsAfter}, emitters {emittersBefore} -> {emittersAfter}`)
 	return model
 end
-
 return prepKitGun
