@@ -23,6 +23,7 @@ GunConfig.Defaults = {
 	HipFov = 70,
 	AdsFov = 50,
 	AdsSpeed = 16,
+	AdsInTime = 0.3,
 	AimOffset = CFrame.identity,
 	HipOffset = CFrame.identity,
 	Bob = {
