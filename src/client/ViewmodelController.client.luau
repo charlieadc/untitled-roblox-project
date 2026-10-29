@@ -166,24 +166,6 @@ local function equip(gunName: string)
 	restoreFov()
 end
 
-local function stopCharacterAnimations()
-	local model = character
-	if model == nil then
-		return
-	end
-	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	if humanoid == nil then
-		return
-	end
-	local animator = humanoid:FindFirstChildOfClass("Animator")
-	if animator == nil then
-		return
-	end
-	for _, track in animator:GetPlayingAnimationTracks() do
-		track:Stop(0)
-	end
-end
-
 local function update(dt: number)
 	local cam = workspace.CurrentCamera
 	if
@@ -202,8 +184,21 @@ local function update(dt: number)
 	local speed = 0
 	local root = character:FindFirstChild("HumanoidRootPart")
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if root ~= nil and root:IsA("BasePart") and humanoid ~= nil and humanoid.WalkSpeed ~= 0 then
-		speed = root.AssemblyLinearVelocity.Magnitude / humanoid.WalkSpeed
+	if root ~= nil and root:IsA("BasePart") and humanoid ~= nil then
+		local height = 1.5
+		if humanoid.RigType == Enum.HumanoidRigType.R15 then
+			if humanoid.AutomaticScalingEnabled then
+				height += (root.Size.Y - 2) / 2
+			else
+				height = 2
+			end
+		end
+		local focus = (root.CFrame * CFrame.new(humanoid.CameraOffset + Vector3.new(0, height, 0))).Position
+		local look = cam.CFrame.LookVector
+		cam.CFrame = CFrame.lookAlong(focus - look * 0.5, look)
+		if humanoid.WalkSpeed ~= 0 then
+			speed = root.AssemblyLinearVelocity.Magnitude / humanoid.WalkSpeed
+		end
 	end
 	if anims ~= nil then
 		if speed > 0 then
@@ -316,7 +311,6 @@ local function onInput(input: InputObject, processed: boolean)
 	end
 end
 
-RunService.PreAnimation:Connect(stopCharacterAnimations)
 RunService:BindToRenderStep("Viewmodel", Enum.RenderPriority.Camera.Value + 1, update)
 
 UserInputService.InputBegan:Connect(onInput)
