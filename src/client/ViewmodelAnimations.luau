@@ -7,6 +7,7 @@ local PRIORITY = {
 	Equip = Enum.AnimationPriority.Action,
 	Fire = Enum.AnimationPriority.Action2,
 	Reload = Enum.AnimationPriority.Action3,
+	Slide = Enum.AnimationPriority.Action,
 }
 
 function ViewmodelAnimations.new(animator: Animator, ids: { [string]: any })

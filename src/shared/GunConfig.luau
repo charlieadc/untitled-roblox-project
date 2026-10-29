@@ -54,8 +54,22 @@ GunConfig.Defaults = {
 	},
 	WalkSpeed = 16,
 	SprintSpeed = 24,
+	SprintBlendSpeed = 10,
+	SprintBlendDamper = 1,
 	SprintOffset = CFrame.new(-0.55, -1.25, -2.2) * CFrame.Angles(math.rad(14), math.rad(-10), 0),
-	Slide = {},
+	Slide = {
+		StartSpeed = 38,
+		Decay = 2.2,
+		EndSpeed = 14,
+		MaxDuration = 0.9,
+		Cooldown = 1.0,
+		CameraDrop = 1.6,
+		CameraTilt = 6,
+		WallCheckDistance = 2.5,
+		Offset = CFrame.new(-0.3, -0.25, 0.1) * CFrame.Angles(0, 0, math.rad(-18)),
+		SpringSpeed = 18,
+		SpringDamper = 0.9,
+	},
 }
 
 local cache = {}

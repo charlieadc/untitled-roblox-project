@@ -25,6 +25,20 @@ local grip: BasePart? = nil
 local recoilState = nil
 local mouseHeld = false
 local pressEdge = false
+local AIR_LIMIT = 0.2
+local slide = {
+	active = false,
+	dir = Vector3.zero,
+	startedAt = 0,
+	airAt = nil,
+	speed = 0,
+	lastEnd = -math.huge,
+	sprintBroken = false,
+}
+local slidePress = false
+local slideSpring = nil
+local lastSlideRoll = 0
+local slideTrackPlayed = false
 
 local function partNamed(model: Model, name: string): BasePart?
 	for _, desc in ipairs(model:GetDescendants()) do
@@ -143,9 +157,141 @@ local function stepRecoil(dt: number, aimAlpha: number, trigger: boolean, blocke
 	return vmOffset, fovAdd, fired
 end
 
+local function freshSlide()
+	return {
+		active = false,
+		dir = Vector3.zero,
+		startedAt = 0,
+		airAt = nil,
+		speed = 0,
+		lastEnd = -math.huge,
+		sprintBroken = false,
+	}
+end
+
+local function stopSlide(now: number)
+	if not slide.active then
+		return
+	end
+	slide.active = false
+	slide.dir = Vector3.zero
+	slide.speed = 0
+	slide.airAt = nil
+	slide.lastEnd = now
+	slide.sprintBroken = true
+end
+
+local function stepSlide(
+	humanoid: Humanoid,
+	root: BasePart?,
+	sprintHeld: boolean,
+	moving: boolean,
+	aiming: boolean,
+	trigger: boolean,
+	now: number
+): string
+	if not sprintHeld then
+		slide.sprintBroken = false
+	end
+	if slide.active then
+		local elapsed = now - slide.startedAt
+		slide.speed = cfg.Slide.StartSpeed * math.exp(-cfg.Slide.Decay * elapsed)
+		if humanoid.FloorMaterial == Enum.Material.Air then
+			if slide.airAt == nil then
+				slide.airAt = now
+			end
+		else
+			slide.airAt = nil
+		end
+		local stop = slide.speed < cfg.Slide.EndSpeed
+			or elapsed > cfg.Slide.MaxDuration
+			or humanoid.Jump
+			or UserInputService:IsKeyDown(Enum.KeyCode.Space)
+			or (slide.airAt ~= nil and now - slide.airAt > AIR_LIMIT)
+		if not stop then
+			if root == nil then
+				stop = true
+			else
+				local exclude = { humanoid.Parent }
+				if rig ~= nil then
+					table.insert(exclude, rig)
+				end
+				for _, child in ipairs(workspace:GetChildren()) do
+					if child:IsA("Tool") then
+						table.insert(exclude, child)
+					end
+				end
+				local params = RaycastParams.new()
+				params.FilterType = Enum.RaycastFilterType.Exclude
+				params.FilterDescendantsInstances = exclude
+				local hit = workspace:Raycast(root.Position, slide.dir * cfg.Slide.WallCheckDistance, params)
+				if hit ~= nil then
+					stop = true
+				end
+			end
+		end
+		if stop then
+			stopSlide(now)
+		end
+	end
+	if
+		not slide.active
+		and slidePress
+		and sprintHeld
+		and moving
+		and not aiming
+		and not trigger
+		and not slide.sprintBroken
+		and humanoid.FloorMaterial ~= Enum.Material.Air
+		and now - slide.lastEnd >= cfg.Slide.Cooldown
+	then
+		local move = humanoid.MoveDirection
+		local flat = Vector3.new(move.X, 0, move.Z)
+		if flat.Magnitude >= 1e-3 then
+			slide.dir = flat.Unit
+			slide.startedAt = now
+			slide.airAt = nil
+			slide.speed = cfg.Slide.StartSpeed
+			slide.active = true
+		end
+	end
+	if slide.active and root ~= nil and root:IsA("BasePart") then
+		humanoid:Move(slide.dir, false)
+		local velocity = root.AssemblyLinearVelocity
+		root.AssemblyLinearVelocity = Vector3.new(slide.dir.X * slide.speed, velocity.Y, slide.dir.Z * slide.speed)
+	end
+	if slide.active then
+		return "slide"
+	elseif sprintHeld and moving and not aiming and not trigger and not slide.sprintBroken then
+		return "sprint"
+	else
+		return "walk"
+	end
+end
+
+local function applySlideCamera(humanoid: Humanoid?, camera: Camera?, alpha: number)
+	if humanoid ~= nil and cfg ~= nil then
+		humanoid.CameraOffset = Vector3.new(0, -cfg.Slide.CameraDrop * alpha, 0)
+	end
+	if camera == nil or cfg == nil then
+		return
+	end
+	local desired = cfg.Slide.CameraTilt * alpha
+	local delta = desired - lastSlideRoll
+	if delta ~= 0 then
+		camera.CFrame *= CFrame.Angles(0, 0, math.rad(delta))
+	end
+	lastSlideRoll = desired
+end
+
 local function equip(gunName: string)
 	mouseHeld = false
 	pressEdge = false
+	if slide.active then
+		stopSlide(os.clock())
+	end
+	local humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
+	applySlideCamera(humanoid, workspace.CurrentCamera, 0)
 	settleRecoil()
 	destroyRig()
 	cfg = GunConfig.get(gunName)
@@ -153,7 +299,9 @@ local function equip(gunName: string)
 	rig.Parent = workspace.CurrentCamera
 	sway = Spring.new(Vector3.zero, cfg.Sway.Speed, cfg.Sway.Damper)
 	aimSpring = Spring.new(Vector3.zero, cfg.AdsSpeed, 1)
-	sprintSpring = Spring.new(Vector3.zero, 10, 1)
+	sprintSpring = Spring.new(Vector3.zero, cfg.SprintBlendSpeed, cfg.SprintBlendDamper)
+	slideSpring = Spring.new(Vector3.zero, cfg.Slide.SpringSpeed, cfg.Slide.SpringDamper)
+	slideTrackPlayed = false
 	recoilState = newRecoil(cfg.Recoil)
 	bobTime = 0
 	lastRotation = nil
@@ -176,10 +324,12 @@ local function update(dt: number)
 		or sway == nil
 		or aimSpring == nil
 		or sprintSpring == nil
+		or slideSpring == nil
 		or cam == nil
 		or character == nil
 		or recoilState == nil
 	then
+		slidePress = false
 		return
 	end
 	hideCharacter(character)
@@ -191,26 +341,47 @@ local function update(dt: number)
 		mouseHeld = false
 	end
 	local trigger = pressEdge or mouseHeld
+	local now = os.clock()
 	local shift = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
 		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 	local moving = humanoid ~= nil and humanoid.MoveDirection.Magnitude > 0
-	local sprinting = shift and moving and not aiming and not trigger
+	local rootPart = if root ~= nil and root:IsA("BasePart") then root else nil
+	local mode = "walk"
 	if humanoid ~= nil then
-		humanoid.WalkSpeed = if sprinting then cfg.SprintSpeed else cfg.WalkSpeed
+		mode = stepSlide(humanoid, rootPart, shift, moving, aiming, trigger, now)
+	end
+	slidePress = false
+	if humanoid ~= nil then
+		humanoid.WalkSpeed = if mode == "slide"
+			then slide.speed
+			elseif mode == "sprint" then cfg.SprintSpeed
+			else cfg.WalkSpeed
 	end
 	local speed = 0
 	if root ~= nil and root:IsA("BasePart") and humanoid ~= nil and humanoid.WalkSpeed ~= 0 then
 		speed = root.AssemblyLinearVelocity.Magnitude / humanoid.WalkSpeed
 	end
 	local sprintClip = false
+	local slideClip = false
 	if anims ~= nil then
+		if mode == "slide" then
+			if not slideTrackPlayed then
+				anims:play("Slide")
+				slideTrackPlayed = true
+			end
+			slideClip = anims:isPlaying("Slide")
+		else
+			anims:stop("Slide")
+			slideTrackPlayed = false
+		end
+		local sprinting = mode == "sprint"
 		if sprinting then
 			anims:play("Sprint")
 			sprintClip = anims:isPlaying("Sprint")
 		else
 			anims:stop("Sprint")
 		end
-		if not sprintClip and speed > 0 then
+		if not sprintClip and mode ~= "slide" and speed > 0 then
 			anims:play("Walk")
 		else
 			anims:stop("Walk")
@@ -220,9 +391,11 @@ local function update(dt: number)
 	aimSpring:setTarget(if aiming then Vector3.xAxis else Vector3.zero)
 	local a = aimSpring:update(dt).X
 	local aimScale = 1 - 0.8 * a
-	sprintSpring:setTarget(if sprinting and not sprintClip then Vector3.xAxis else Vector3.zero)
+	sprintSpring:setTarget(if mode == "sprint" and not sprintClip then Vector3.xAxis else Vector3.zero)
 	local s = sprintSpring:update(dt).X
-	local bobMult = if sprinting then cfg.Bob.SprintMult else 1
+	slideSpring:setTarget(if mode == "slide" then Vector3.xAxis else Vector3.zero)
+	local slideS = slideSpring:update(dt).X
+	local bobMult = 1 + (cfg.Bob.SprintMult - 1) * s
 	local bobCF = CFrame.new(Vector3.yAxis * math.sin(bobTime) * cfg.Bob.Amount * bobMult * speed * aimScale)
 
 	local rotation = cam.CFrame.Rotation
@@ -233,11 +406,14 @@ local function update(dt: number)
 	local blocked = anims ~= nil and anims:isPlaying("Reload")
 	local vmOffset, fovAdd, fired = stepRecoil(dt, a, trigger, blocked, cam)
 	pressEdge = false
+	applySlideCamera(humanoid, cam, slideS)
 	lastRotation = cam.CFrame.Rotation
 	local offset = sway:update(dt)
 	local swayCF = CFrame.fromOrientation(offset.X * aimScale, offset.Y * aimScale, offset.Z * aimScale)
 
-	local hipCF = bobCF * swayCF * cfg.HipOffset:Lerp(cfg.SprintOffset, if sprintClip then 0 else s)
+	local sprintPose = if sprintClip then 0 else s
+	local slidePose = if slideClip then 0 else slideS
+	local hipCF = bobCF * swayCF * cfg.HipOffset:Lerp(cfg.SprintOffset, sprintPose):Lerp(cfg.Slide.Offset, slidePose)
 	local hrp = rig:FindFirstChild("HumanoidRootPart") :: BasePart
 	local sight = ViewmodelRig.sightCFrame(rig)
 	local aimCF = (hrp.CFrame:ToObjectSpace(sight) * cfg.AimOffset):Inverse()
@@ -261,6 +437,12 @@ local function onDied()
 		diedConnection:Disconnect()
 		diedConnection = nil
 	end
+	local humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
+	applySlideCamera(humanoid, workspace.CurrentCamera, 0)
+	slide = freshSlide()
+	slideSpring = nil
+	slideTrackPlayed = false
+	slidePress = false
 	settleRecoil()
 	restoreFov()
 	destroyRig()
@@ -302,6 +484,10 @@ local function onInput(input: InputObject, processed: boolean)
 		return
 	end
 	if processed or anims == nil or rig == nil or cfg == nil then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.LeftControl then
+		slidePress = true
 		return
 	end
 	if input.KeyCode ~= Enum.KeyCode.R then
