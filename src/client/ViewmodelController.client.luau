@@ -10,8 +10,6 @@ local ViewmodelAnimations = require(script.Parent:WaitForChild("ViewmodelAnimati
 
 local player = Players.LocalPlayer
 
-local WALK_SPEED_RATIO = 0.05
-
 local rig: Model? = nil
 local cfg = nil
 local sway = nil
@@ -20,12 +18,37 @@ local diedConnection: RBXScriptConnection? = nil
 local bobTime = 0
 local lastRotation: CFrame? = nil
 local anims = nil
+local firePart: BasePart? = nil
+local grip: BasePart? = nil
+
+local function partNamed(model: Model, name: string): BasePart?
+	for _, desc in ipairs(model:GetDescendants()) do
+		if desc.Name == name and desc:IsA("BasePart") then
+			return desc
+		end
+	end
+	return nil
+end
+
+local function playSound(root: Instance, name: any)
+	if type(name) ~= "string" or name == "" then
+		return
+	end
+	for _, desc in ipairs(root:GetDescendants()) do
+		if desc.Name == name and desc:IsA("Sound") then
+			desc:Play()
+			return
+		end
+	end
+end
 
 local function destroyRig()
 	if anims ~= nil then
 		anims:destroy()
 		anims = nil
 	end
+	firePart = nil
+	grip = nil
 	if rig ~= nil then
 		rig:Destroy()
 		rig = nil
@@ -48,9 +71,14 @@ local function equip(gunName: string)
 	sway = Spring.new(Vector3.zero, cfg.Sway.Speed, cfg.Sway.Damper)
 	bobTime = 0
 	lastRotation = nil
-	anims = ViewmodelAnimations.new(rig.AnimationController.Animator, cfg.AnimationIds)
-	anims:play("Equip")
-	anims:play("Idle")
+	local animator = rig:FindFirstChildWhichIsA("Animator", true)
+	if animator ~= nil then
+		anims = ViewmodelAnimations.new(animator :: Animator, cfg.AnimationIds)
+		anims:play("Equip")
+		anims:play("Idle")
+	end
+	firePart = partNamed(rig, "FirePart")
+	grip = partNamed(rig, "Grip")
 end
 
 local function update(dt: number)
@@ -67,7 +95,7 @@ local function update(dt: number)
 		speed = root.AssemblyLinearVelocity.Magnitude / humanoid.WalkSpeed
 	end
 	if anims ~= nil then
-		if speed > WALK_SPEED_RATIO then
+		if speed > 0 then
 			anims:play("Walk")
 		else
 			anims:stop("Walk")
@@ -119,27 +147,6 @@ if player.Character ~= nil then
 	onCharacter(player.Character)
 end
 
-local function partNamed(model: Model, name: string): BasePart?
-	for _, desc in ipairs(model:GetDescendants()) do
-		if desc.Name == name and desc:IsA("BasePart") then
-			return desc
-		end
-	end
-	return nil
-end
-
-local function playSound(root: Instance, name: any)
-	if type(name) ~= "string" or name == "" then
-		return
-	end
-	for _, desc in ipairs(root:GetDescendants()) do
-		if desc.Name == name and desc:IsA("Sound") then
-			desc:Play()
-			return
-		end
-	end
-end
-
 local function onInput(input: InputObject, processed: boolean)
 	if processed or anims == nil or rig == nil or cfg == nil then
 		return
@@ -154,7 +161,6 @@ local function onInput(input: InputObject, processed: boolean)
 	end
 	if fire then
 		anims:play("Fire")
-		local firePart = partNamed(rig, "FirePart")
 		if firePart ~= nil then
 			playSound(firePart, cfg.Sounds.Fire)
 			for _, desc in ipairs(firePart:GetDescendants()) do
@@ -166,7 +172,6 @@ local function onInput(input: InputObject, processed: boolean)
 		return
 	end
 	anims:play("Reload")
-	local grip = partNamed(rig, "Grip")
 	if grip ~= nil then
 		for _, name in ipairs(cfg.Sounds.Reload) do
 			playSound(grip, name)
