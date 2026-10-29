@@ -3,7 +3,7 @@ local GunConfig = require(ReplicatedStorage:WaitForChild("GunConfig"))
 local ViewmodelRig = {}
 local RIGHT_ARM_NAME = "Right Arm"
 local ARMS = {
-	{ name = "Left Arm", offset = CFrame.new(1.5, 0, 0) * CFrame.new(-0.3, 0.05, -0.45) },
+	{ name = "Left Arm", offset = CFrame.new(1.2, 0.05, -0.45) },
 	{ name = RIGHT_ARM_NAME, offset = CFrame.new(1.5, 0, 0) },
 }
 local GUN_PARTS = {
@@ -23,10 +23,6 @@ local function makeBlock(name: string, at: CFrame): Part
 	block.Size = Vector3.new(1, 1, 1)
 	block.CFrame = at
 	block.Anchored = false
-	block.CanCollide = false
-	block.CanQuery = false
-	block.CanTouch = false
-	block.Massless = true
 	return block
 end
 local function findTemplate(folderName: string, modelName: string): Model?
@@ -80,9 +76,9 @@ local function beginModel(
 	table.insert(missing, label)
 	return model, nil
 end
-local function findGripMotor(rig: Model, right: BasePart): Motor6D?
+local function findGripMotor(rig: Model): Motor6D?
 	for _, desc in ipairs(rig:GetDescendants()) do
-		if desc:IsA("Motor6D") and desc.Name == "Grip" and desc.Part0 == right then
+		if desc:IsA("Motor6D") and desc.Name == "Grip" then
 			return desc
 		end
 	end
@@ -93,7 +89,6 @@ local function ensureArms(missing: { string }): Model
 	local hrp, createdRoot = slot(rig, "HumanoidRootPart", CFrame.identity, report)
 	if createdRoot then
 		hrp.Anchored = true
-		hrp.CanCollide = false
 		hrp.Transparency = 1
 	end
 	if rig.PrimaryPart == nil then
@@ -139,9 +134,10 @@ end
 local function joinGun(rig: Model, gun: Model)
 	local right = childPart(rig, RIGHT_ARM_NAME) :: BasePart
 	local grip = childPart(gun, "Grip") :: BasePart
-	local motor = findGripMotor(rig, right)
+	local motor = findGripMotor(rig)
 	gun.Parent = rig
 	if motor ~= nil then
+		motor.Part0 = right
 		motor.Part1 = grip
 		return
 	end
@@ -167,6 +163,19 @@ function ViewmodelRig.build(gunName: string): Model
 	if #missing > 0 then
 		warn(`ViewmodelRig: missing {table.concat(missing, ", ")}`)
 	end
+	for _, desc in ipairs(rig:GetDescendants()) do
+		if desc:IsA("BasePart") then
+			desc.CanCollide = false
+			desc.CanQuery = false
+			desc.CanTouch = false
+			desc.Massless = true
+			desc.CastShadow = false
+		elseif desc:IsA("Humanoid") then
+			desc.EvaluateStateMachine = false
+			desc.RequiresNeck = false
+			desc.BreakJointsOnDeath = false
+		end
+	end
 	return rig
 end
 local function gunOf(rig: Model): Model?
@@ -181,9 +190,6 @@ local function motorProblem(partParent: Instance, motorParent: Instance, name: s
 	local part = childPart(partParent, name)
 	if part == nil then
 		return `{name} is missing`
-	end
-	if part.CanCollide or part.CanQuery or part.CanTouch then
-		return `{name} must ignore collision`
 	end
 	local joint = motorParent:FindFirstChild(name)
 	if joint == nil or not joint:IsA("Motor6D") or joint.Part0 ~= part0 or joint.Part1 ~= part then
@@ -228,8 +234,8 @@ function ViewmodelRig.validate(rig: Model): (boolean, string?)
 		return false, "Animator is missing"
 	end
 	local right = childPart(rig, RIGHT_ARM_NAME) :: BasePart
-	local gripMotor = findGripMotor(rig, right)
-	if gripMotor == nil or gripMotor.Part1 ~= grip then
+	local gripMotor = findGripMotor(rig)
+	if gripMotor == nil or gripMotor.Part0 ~= right or gripMotor.Part1 ~= grip then
 		return false, "Grip motor is missing"
 	end
 	local joined = {}
