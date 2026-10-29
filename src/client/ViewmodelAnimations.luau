@@ -1,20 +1,26 @@
 local ViewmodelAnimations = {}
 
-local PRIORITY = {
-	Idle = Enum.AnimationPriority.Idle,
-	Walk = Enum.AnimationPriority.Movement,
-	Sprint = Enum.AnimationPriority.Movement,
-	Equip = Enum.AnimationPriority.Action,
-	Fire = Enum.AnimationPriority.Action2,
-	Reload = Enum.AnimationPriority.Action3,
+type Clip = {
+	priority: Enum.AnimationPriority,
+	looped: boolean,
+}
+
+local CLIP: { [string]: Clip } = {
+	Idle = { priority = Enum.AnimationPriority.Idle, looped = true },
+	Walk = { priority = Enum.AnimationPriority.Movement, looped = true },
+	AdsStatic = { priority = Enum.AnimationPriority.Movement, looped = true },
+	Equip = { priority = Enum.AnimationPriority.Action, looped = false },
+	AdsIn = { priority = Enum.AnimationPriority.Action, looped = false },
+	Fire = { priority = Enum.AnimationPriority.Action2, looped = false },
+	Reload = { priority = Enum.AnimationPriority.Action3, looped = false },
 }
 
 function ViewmodelAnimations.new(animator: Animator, ids: { [string]: any })
 	local tracks: { [string]: AnimationTrack } = {}
 	local skipped = {}
 	for name, id in pairs(ids) do
-		local priority = PRIORITY[name]
-		if priority == nil or type(id) ~= "string" or id == "" or id == "rbxassetid://0" then
+		local clip = CLIP[name]
+		if clip == nil or type(id) ~= "string" or id == "" or id == "rbxassetid://0" then
 			table.insert(skipped, name)
 		else
 			local animation = Instance.new("Animation")
@@ -22,8 +28,8 @@ function ViewmodelAnimations.new(animator: Animator, ids: { [string]: any })
 			animation.AnimationId = id
 			animation.Parent = animator
 			local track = animator:LoadAnimation(animation)
-			track.Priority = priority
-			track.Looped = name == "Idle" or name == "Walk" or name == "Sprint"
+			track.Priority = clip.priority
+			track.Looped = clip.looped
 			tracks[name] = track
 		end
 	end
@@ -47,6 +53,10 @@ function ViewmodelAnimations.new(animator: Animator, ids: { [string]: any })
 	function api:isPlaying(name: string): boolean
 		local track = tracks[name]
 		return track ~= nil and track.IsPlaying
+	end
+	function api:length(name: string): number
+		local track = tracks[name]
+		return if track ~= nil then track.Length else 0
 	end
 	function api:destroy()
 		for _, track in pairs(tracks) do
