@@ -13,6 +13,7 @@ local player = Players.LocalPlayer
 local rig: Model? = nil
 local cfg = nil
 local sway = nil
+local aimSpring = nil
 local character: Model? = nil
 local diedConnection: RBXScriptConnection? = nil
 local bobTime = 0
@@ -63,12 +64,20 @@ local function hideCharacter(model: Model)
 	end
 end
 
+local function restoreFov()
+	local cam = workspace.CurrentCamera
+	if cam ~= nil and cfg ~= nil then
+		cam.FieldOfView = cfg.HipFov
+	end
+end
+
 local function equip(gunName: string)
 	destroyRig()
 	cfg = GunConfig.get(gunName)
 	rig = ViewmodelRig.build(gunName)
 	rig.Parent = workspace.CurrentCamera
 	sway = Spring.new(Vector3.zero, cfg.Sway.Speed, cfg.Sway.Damper)
+	aimSpring = Spring.new(Vector3.zero, cfg.AdsSpeed, 1)
 	bobTime = 0
 	lastRotation = nil
 	local animator = rig:FindFirstChildWhichIsA("Animator", true)
@@ -79,11 +88,12 @@ local function equip(gunName: string)
 	end
 	firePart = partNamed(rig, "FirePart")
 	grip = partNamed(rig, "Grip")
+	restoreFov()
 end
 
 local function update(dt: number)
 	local cam = workspace.CurrentCamera
-	if rig == nil or cfg == nil or sway == nil or cam == nil or character == nil then
+	if rig == nil or cfg == nil or sway == nil or aimSpring == nil or cam == nil or character == nil then
 		return
 	end
 	hideCharacter(character)
@@ -102,7 +112,11 @@ local function update(dt: number)
 		end
 	end
 	bobTime += dt * cfg.Bob.Speed
-	local bobCF = CFrame.new(Vector3.yAxis * math.sin(bobTime) * cfg.Bob.Amount * speed)
+	local held = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+	aimSpring:setTarget(if held then Vector3.xAxis else Vector3.zero)
+	local a = aimSpring:update(dt).X
+	local aimScale = 1 - 0.8 * a
+	local bobCF = CFrame.new(Vector3.yAxis * math.sin(bobTime) * cfg.Bob.Amount * speed * aimScale)
 
 	local rotation = cam.CFrame.Rotation
 	if lastRotation ~= nil then
@@ -111,9 +125,14 @@ local function update(dt: number)
 	end
 	lastRotation = rotation
 	local offset = sway:update(dt)
-	local swayCF = CFrame.fromOrientation(offset.X, offset.Y, offset.Z)
+	local swayCF = CFrame.fromOrientation(offset.X * aimScale, offset.Y * aimScale, offset.Z * aimScale)
 
-	rig:PivotTo(cam.CFrame * bobCF * swayCF)
+	local hipCF = bobCF * swayCF
+	local hrp = rig:FindFirstChild("HumanoidRootPart") :: BasePart
+	local sight = ViewmodelRig.sightCFrame(rig)
+	local aimCF = (hrp.CFrame:ToObjectSpace(sight) * cfg.AimOffset):Inverse()
+	rig:PivotTo(cam.CFrame * hipCF:Lerp(aimCF, a))
+	cam.FieldOfView = cfg.HipFov + (cfg.AdsFov - cfg.HipFov) * a
 end
 
 local function onDied()
@@ -121,8 +140,10 @@ local function onDied()
 		diedConnection:Disconnect()
 		diedConnection = nil
 	end
+	restoreFov()
 	destroyRig()
 	sway = nil
+	aimSpring = nil
 	cfg = nil
 	character = nil
 	lastRotation = nil
