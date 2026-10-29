@@ -226,7 +226,7 @@ function ViewmodelRig.validate(rig: Model): (boolean, string?)
 	end
 	local joined = {}
 	for _, joint in ipairs(grip:GetChildren()) do
-		if joint:IsA("WeldConstraint") or joint:IsA("Motor6D") then
+		if (joint:IsA("WeldConstraint") and joint.Part1 ~= nil) or joint:IsA("Motor6D") then
 			joined[joint.Part1] = true
 		end
 	end
