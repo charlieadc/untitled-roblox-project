@@ -166,6 +166,24 @@ local function equip(gunName: string)
 	restoreFov()
 end
 
+local function stopCharacterAnimations()
+	local model = character
+	if model == nil then
+		return
+	end
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid == nil then
+		return
+	end
+	local animator = humanoid:FindFirstChildOfClass("Animator")
+	if animator == nil then
+		return
+	end
+	for _, track in animator:GetPlayingAnimationTracks() do
+		track:Stop(0)
+	end
+end
+
 local function update(dt: number)
 	local cam = workspace.CurrentCamera
 	if
@@ -298,6 +316,7 @@ local function onInput(input: InputObject, processed: boolean)
 	end
 end
 
+RunService.PreAnimation:Connect(stopCharacterAnimations)
 RunService:BindToRenderStep("Viewmodel", Enum.RenderPriority.Camera.Value + 1, update)
 
 UserInputService.InputBegan:Connect(onInput)
