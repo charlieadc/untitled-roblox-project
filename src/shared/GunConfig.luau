@@ -26,6 +26,7 @@ GunConfig.Defaults = {
 	Bob = {
 		Amount = 0.25,
 		Speed = 8,
+		SprintMult = 1.6,
 	},
 	Sway = {
 		Amount = 1,
@@ -51,7 +52,9 @@ GunConfig.Defaults = {
 		AdsKickMult = 0.5,
 		FireRate = 600,
 	},
-	SprintOffset = CFrame.identity,
+	WalkSpeed = 16,
+	SprintSpeed = 24,
+	SprintOffset = CFrame.new(-0.55, -1.25, -2.2) * CFrame.Angles(math.rad(14), math.rad(-10), 0),
 	Slide = {},
 }
 

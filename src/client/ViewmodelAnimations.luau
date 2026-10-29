@@ -3,6 +3,7 @@ local ViewmodelAnimations = {}
 local PRIORITY = {
 	Idle = Enum.AnimationPriority.Idle,
 	Walk = Enum.AnimationPriority.Movement,
+	Sprint = Enum.AnimationPriority.Movement,
 	Equip = Enum.AnimationPriority.Action,
 	Fire = Enum.AnimationPriority.Action2,
 	Reload = Enum.AnimationPriority.Action3,
@@ -22,7 +23,7 @@ function ViewmodelAnimations.new(animator: Animator, ids: { [string]: any })
 			animation.Parent = animator
 			local track = animator:LoadAnimation(animation)
 			track.Priority = priority
-			track.Looped = name == "Idle" or name == "Walk"
+			track.Looped = name == "Idle" or name == "Walk" or name == "Sprint"
 			tracks[name] = track
 		end
 	end
