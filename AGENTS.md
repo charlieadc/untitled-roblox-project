@@ -1,25 +1,25 @@
 # Agents
 
-Write all code on disk under `src`.
+Edit Luau on disk under `src`. Then push the script into Studio with Studio MCP. Never hand-edit a script in Studio. Disk is the source of truth.
 
-Use Studio MCP only for the map, for instances, for playtests, and for the console. Never edit a Rojo-managed script inside Studio.
+Map each folder to a service.
 
-Rojo syncs only in Edit mode. Stop the playtest before you sync again.
+- `src/server` maps to ServerScriptService.
+- `src/client` maps to `StarterPlayer.StarterPlayerScripts`.
+- `src/shared` maps to ReplicatedStorage.
+- A subfolder becomes a Folder.
 
-`default.project.json` maps directories to services.
+Name each file for its class.
 
-- `src/server` syncs into ServerScriptService.
-- `src/client` syncs into `StarterPlayer.StarterPlayerScripts`.
-- `src/shared` syncs into ReplicatedStorage.
+- `Name.server.luau` is a Script.
+- `Name.client.luau` is a LocalScript.
+- `Name.luau` is a ModuleScript.
 
-Name server scripts `Name.server.luau`, client scripts `Name.client.luau`, and shared modules `Name.luau`. Do not put `init.server.luau`, `init.client.luau`, or `init.luau` directly in those three directories. Rojo would try to turn the service into a script.
-
-Rojo removes a child of those three services when no file represents that child. Put the map in Workspace. The project file does not list Workspace.
+The instance name is the file name without suffixes.
 
 From the repository root, run these commands before each pull request.
 
 ```sh
 selene src
 stylua --check src
-rojo build -o test.rbxl
 ```

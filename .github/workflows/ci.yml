@@ -26,6 +26,3 @@ jobs:
 
       - name: Format
         run: stylua --check src
-
-      - name: Build
-        run: rojo build -o test.rbxl
