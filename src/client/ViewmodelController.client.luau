@@ -24,6 +24,7 @@ local grip: BasePart? = nil
 local recoilState = nil
 local mouseHeld = false
 local pressEdge = false
+local aimWasHeld = false
 
 local function partNamed(model: Model, name: string): BasePart?
 	for _, desc in ipairs(model:GetDescendants()) do
@@ -144,6 +145,7 @@ end
 
 local function equip(gunName: string)
 	mouseHeld = false
+	aimWasHeld = false
 	pressEdge = false
 	settleRecoil()
 	destroyRig()
@@ -196,6 +198,18 @@ local function update(dt: number)
 	end
 	bobTime += dt * cfg.Bob.Speed
 	local held = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+	if anims ~= nil and held ~= aimWasHeld then
+		if held then
+			local adsInLength = anims:length("AdsIn")
+			local adsInSpeed = if adsInLength > 0 then adsInLength / 0.3 else 1
+			anims:play("AdsIn", nil, adsInSpeed)
+			anims:play("AdsStatic")
+		else
+			anims:stop("AdsIn", 0.1)
+			anims:stop("AdsStatic", 0.1)
+		end
+		aimWasHeld = held
+	end
 	aimSpring:setTarget(if held then Vector3.xAxis else Vector3.zero)
 	local a = aimSpring:update(dt).X
 	local aimScale = 1 - 0.8 * a
@@ -251,6 +265,7 @@ local function onDied()
 	character = nil
 	lastRotation = nil
 	mouseHeld = false
+	aimWasHeld = false
 	pressEdge = false
 end
 

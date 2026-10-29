@@ -8,6 +8,8 @@ GunConfig.Defaults = {
 	AnimationIds = {
 		Idle = "rbxassetid://0",
 		Walk = "rbxassetid://0",
+		AdsIn = "rbxassetid://0",
+		AdsStatic = "rbxassetid://0",
 		Sprint = "rbxassetid://0",
 		Equip = "rbxassetid://0",
 		Fire = "rbxassetid://0",
@@ -20,7 +22,7 @@ GunConfig.Defaults = {
 	},
 	HipFov = 70,
 	AdsFov = 50,
-	AdsSpeed = 10,
+	AdsSpeed = 16,
 	AimOffset = CFrame.identity,
 	HipOffset = CFrame.identity,
 	Bob = {
