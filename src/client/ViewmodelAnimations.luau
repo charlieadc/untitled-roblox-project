@@ -8,11 +8,15 @@ type Clip = {
 local CLIP: { [string]: Clip } = {
 	Idle = { priority = Enum.AnimationPriority.Idle, looped = true },
 	Walk = { priority = Enum.AnimationPriority.Movement, looped = true },
+	Sprint = { priority = Enum.AnimationPriority.Movement, looped = true },
 	AdsStatic = { priority = Enum.AnimationPriority.Movement, looped = true },
 	Equip = { priority = Enum.AnimationPriority.Action, looped = false },
-	AdsIn = { priority = Enum.AnimationPriority.Action, looped = false },
+	SprintIn = { priority = Enum.AnimationPriority.Action, looped = false },
+	SprintOut = { priority = Enum.AnimationPriority.Action, looped = false },
+	Slide = { priority = Enum.AnimationPriority.Action, looped = true },
 	Fire = { priority = Enum.AnimationPriority.Action2, looped = false },
 	Reload = { priority = Enum.AnimationPriority.Action3, looped = false },
+	ReloadEmpty = { priority = Enum.AnimationPriority.Action3, looped = false },
 }
 
 function ViewmodelAnimations.new(animator: Animator, ids: { [string]: any })
@@ -53,10 +57,6 @@ function ViewmodelAnimations.new(animator: Animator, ids: { [string]: any })
 	function api:isPlaying(name: string): boolean
 		local track = tracks[name]
 		return track ~= nil and track.IsPlaying
-	end
-	function api:length(name: string): number
-		local track = tracks[name]
-		return if track ~= nil then track.Length else 0
 	end
 	function api:destroy()
 		for _, track in pairs(tracks) do

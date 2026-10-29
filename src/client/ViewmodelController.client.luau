@@ -25,7 +25,7 @@ local recoilState = nil
 local mouseHeld = false
 local pressEdge = false
 local aimWasHeld = false
-local adsInStarted = false
+local wasSprinting = false
 
 local function partNamed(model: Model, name: string): BasePart?
 	for _, desc in ipairs(model:GetDescendants()) do
@@ -147,7 +147,7 @@ end
 local function equip(gunName: string)
 	mouseHeld = false
 	aimWasHeld = false
-	adsInStarted = false
+	wasSprinting = false
 	pressEdge = false
 	settleRecoil()
 	destroyRig()
@@ -185,46 +185,51 @@ local function update(dt: number)
 	end
 	hideCharacter(character)
 
-	local speed = 0
 	local root = character:FindFirstChild("HumanoidRootPart")
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local held = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+	if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+		mouseHeld = false
+	end
+	local trigger = pressEdge or mouseHeld
+	local shift = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+	local moving = humanoid ~= nil and humanoid.MoveDirection.Magnitude > 0
+	local sprinting = shift and moving and not held and not trigger
+	local speed = 0
 	if root ~= nil and root:IsA("BasePart") and humanoid ~= nil and humanoid.WalkSpeed ~= 0 then
 		speed = root.AssemblyLinearVelocity.Magnitude / humanoid.WalkSpeed
 	end
 	if anims ~= nil then
-		if speed > 0 then
+		if sprinting and not wasSprinting then
+			anims:play("SprintIn")
+		elseif not sprinting and wasSprinting then
+			anims:stop("Sprint", 0.1)
+			anims:play("SprintOut")
+		end
+		if sprinting then
+			anims:play("Sprint")
+			anims:stop("Walk")
+		elseif speed > 0 and not held then
 			anims:play("Walk")
 		else
 			anims:stop("Walk")
 		end
+		wasSprinting = sprinting
 	end
 	bobTime += dt * cfg.Bob.Speed
-	local held = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
 	if anims ~= nil and held ~= aimWasHeld then
 		if held then
 			anims:play("AdsStatic")
 		else
-			anims:stop("AdsIn", 0.1)
 			anims:stop("AdsStatic", 0.1)
-			adsInStarted = false
 		end
 		aimWasHeld = held
-	end
-	if anims ~= nil and held and not adsInStarted then
-		local adsInLength = anims:length("AdsIn")
-		if adsInLength > 0 then
-			anims:play("AdsIn", nil, adsInLength / cfg.AdsInTime)
-			adsInStarted = true
-		end
 	end
 	aimSpring:setTarget(if held then Vector3.xAxis else Vector3.zero)
 	local a = aimSpring:update(dt).X
 	local aimScale = 1 - 0.8 * a
 	local bobCF = CFrame.new(Vector3.yAxis * math.sin(bobTime) * cfg.Bob.Amount * speed * aimScale)
-
-	if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-		mouseHeld = false
-	end
 
 	local rotation = cam.CFrame.Rotation
 	if lastRotation ~= nil then
@@ -232,7 +237,6 @@ local function update(dt: number)
 		sway:impulse(-Vector3.new(pitch, yaw, roll) * cfg.Sway.Amount)
 	end
 	local blocked = anims ~= nil and anims:isPlaying("Reload")
-	local trigger = pressEdge or mouseHeld
 	local vmOffset, fovAdd, fired = stepRecoil(dt, a, trigger, blocked, cam)
 	pressEdge = false
 	lastRotation = cam.CFrame.Rotation
@@ -273,7 +277,7 @@ local function onDied()
 	lastRotation = nil
 	mouseHeld = false
 	aimWasHeld = false
-	adsInStarted = false
+	wasSprinting = false
 	pressEdge = false
 end
 
@@ -304,19 +308,30 @@ local function onInput(input: InputObject, processed: boolean)
 		end
 		return
 	end
-	if processed or anims == nil or rig == nil or cfg == nil then
+	if processed or not RunService:IsStudio() or anims == nil or rig == nil or cfg == nil then
 		return
 	end
-	if input.KeyCode ~= Enum.KeyCode.R then
-		return
-	end
-	if anims:isPlaying("Reload") then
-		return
-	end
-	anims:play("Reload")
-	if grip ~= nil then
-		for _, name in ipairs(cfg.Sounds.Reload) do
-			playSound(grip, name)
+	if input.KeyCode == Enum.KeyCode.R then
+		if anims:isPlaying("Reload") then
+			return
+		end
+		anims:play("Reload")
+		if grip ~= nil then
+			for _, name in ipairs(cfg.Sounds.Reload) do
+				playSound(grip, name)
+			end
+		end
+	elseif input.KeyCode == Enum.KeyCode.T then
+		if not anims:isPlaying("ReloadEmpty") then
+			anims:play("ReloadEmpty")
+		end
+	elseif input.KeyCode == Enum.KeyCode.F then
+		anims:play("Fire")
+	elseif input.KeyCode == Enum.KeyCode.C then
+		if anims:isPlaying("Slide") then
+			anims:stop("Slide")
+		else
+			anims:play("Slide")
 		end
 	end
 end
