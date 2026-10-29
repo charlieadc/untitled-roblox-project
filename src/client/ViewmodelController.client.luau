@@ -113,18 +113,23 @@ local function stepRecoil(dt: number, aimAlpha: number, trigger: boolean, blocke
 		local profile = state.profile
 		local now = os.clock()
 		local interval = 60 / profile.FireRate
-		if now - state.lastShot >= interval then
+		local since = now - state.lastShot
+		if since >= interval then
 			local mult = 1 - (1 - profile.AdsKickMult) * aimAlpha
-			if now - state.lastShot > profile.FirstShotResetTime then
+			if since > profile.FirstShotResetTime then
 				mult *= profile.FirstShotMult
 			end
 			local yaw = (math.random() * 2 - 1) * profile.CamKickYaw
 			local roll = (math.random() * 2 - 1) * profile.VmKickRoll
-			state.cam:impulse(Vector3.new(profile.CamKickPitch, yaw, 0) * mult)
-			state.vmPos:impulse(Vector3.new(0, profile.VmKickUp, profile.VmKickBack) * mult)
-			state.vmRot:impulse(Vector3.new(profile.VmKickPitch, 0, roll) * mult)
-			state.fov:impulse(Vector3.new(profile.FovPunch, 0, 0))
-			state.lastShot = now
+			state.cam:impulse(Vector3.new(profile.CamKickPitch, yaw, 0) * mult * profile.CamSpeed)
+			state.vmPos:impulse(Vector3.new(0, profile.VmKickUp, profile.VmKickBack) * mult * profile.VmSpeed)
+			state.vmRot:impulse(Vector3.new(profile.VmKickPitch, 0, roll) * mult * profile.VmSpeed)
+			state.fov:impulse(Vector3.new(profile.FovPunch, 0, 0) * profile.FovSpeed)
+			if since > interval * 2 then
+				state.lastShot = now
+			else
+				state.lastShot += interval
+			end
 			fired = true
 		end
 	end
@@ -138,6 +143,8 @@ local function stepRecoil(dt: number, aimAlpha: number, trigger: boolean, blocke
 end
 
 local function equip(gunName: string)
+	mouseHeld = false
+	pressEdge = false
 	settleRecoil()
 	destroyRig()
 	cfg = GunConfig.get(gunName)

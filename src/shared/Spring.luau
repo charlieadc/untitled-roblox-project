@@ -20,11 +20,17 @@ function Spring:impulse(velocity: Vector3)
 end
 
 function Spring:update(dt: number): Vector3
-	dt = math.min(dt, 1 / 30)
+	local n = math.ceil(dt / (1 / 240))
+	if n < 1 then
+		return self.position
+	end
+	local h = dt / n
 	local speed = self.speed
-	local acceleration = (self.target - self.position) * (speed * speed) - self.velocity * (2 * self.damper * speed)
-	self.velocity += acceleration * dt
-	self.position += self.velocity * dt
+	for _ = 1, n do
+		local acceleration = (self.target - self.position) * (speed * speed) - self.velocity * (2 * self.damper * speed)
+		self.velocity += acceleration * h
+		self.position += self.velocity * h
+	end
 	return self.position
 end
 
