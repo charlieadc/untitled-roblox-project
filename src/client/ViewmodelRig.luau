@@ -3,7 +3,7 @@ local GunConfig = require(ReplicatedStorage:WaitForChild("GunConfig"))
 local ViewmodelRig = {}
 local RIGHT_ARM_NAME = "Right Arm"
 local ARMS = {
-	{ name = "Left Arm", offset = CFrame.new(1.5, 0, 0) * CFrame.new(-0.3, 0.05, -0.45) },
+	{ name = "Left Arm", offset = CFrame.new(1.2, 0.05, -0.45) },
 	{ name = RIGHT_ARM_NAME, offset = CFrame.new(1.5, 0, 0) },
 }
 local GUN_PARTS = {
@@ -76,9 +76,9 @@ local function beginModel(
 	table.insert(missing, label)
 	return model, nil
 end
-local function findGripMotor(rig: Model, right: BasePart): Motor6D?
+local function findGripMotor(rig: Model): Motor6D?
 	for _, desc in ipairs(rig:GetDescendants()) do
-		if desc:IsA("Motor6D") and desc.Name == "Grip" and desc.Part0 == right then
+		if desc:IsA("Motor6D") and desc.Name == "Grip" then
 			return desc
 		end
 	end
@@ -134,9 +134,10 @@ end
 local function joinGun(rig: Model, gun: Model)
 	local right = childPart(rig, RIGHT_ARM_NAME) :: BasePart
 	local grip = childPart(gun, "Grip") :: BasePart
-	local motor = findGripMotor(rig, right)
+	local motor = findGripMotor(rig)
 	gun.Parent = rig
 	if motor ~= nil then
+		motor.Part0 = right
 		motor.Part1 = grip
 		return
 	end
@@ -233,8 +234,8 @@ function ViewmodelRig.validate(rig: Model): (boolean, string?)
 		return false, "Animator is missing"
 	end
 	local right = childPart(rig, RIGHT_ARM_NAME) :: BasePart
-	local gripMotor = findGripMotor(rig, right)
-	if gripMotor == nil or gripMotor.Part1 ~= grip then
+	local gripMotor = findGripMotor(rig)
+	if gripMotor == nil or gripMotor.Part0 ~= right or gripMotor.Part1 ~= grip then
 		return false, "Grip motor is missing"
 	end
 	local joined = {}
