@@ -1,9 +1,10 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GunConfig = require(ReplicatedStorage:WaitForChild("GunConfig"))
 local ViewmodelRig = {}
-local ARM_OFFSET = {
-	LeftArm = CFrame.new(1.5, 0, 0) * CFrame.new(-0.3, 0.05, -0.45),
-	RightArm = CFrame.new(1.5, 0, 0),
+local RIGHT_ARM_NAME = "Right Arm"
+local ARMS = {
+	{ name = "Left Arm", offset = CFrame.new(1.5, 0, 0) * CFrame.new(-0.3, 0.05, -0.45) },
+	{ name = RIGHT_ARM_NAME, offset = CFrame.new(1.5, 0, 0) },
 }
 local GUN_PARTS = {
 	{ "AimPart", CFrame.new(0, 0, -1), false },
@@ -79,6 +80,14 @@ local function beginModel(
 	table.insert(missing, label)
 	return model, nil
 end
+local function findGripMotor(rig: Model, right: BasePart): Motor6D?
+	for _, desc in ipairs(rig:GetDescendants()) do
+		if desc:IsA("Motor6D") and desc.Name == "Grip" and desc.Part0 == right then
+			return desc
+		end
+	end
+	return nil
+end
 local function ensureArms(missing: { string }): Model
 	local rig, report = beginModel("Viewmodels", "Arms", "arms", missing)
 	local hrp, createdRoot = slot(rig, "HumanoidRootPart", CFrame.identity, report)
@@ -90,26 +99,19 @@ local function ensureArms(missing: { string }): Model
 	if rig.PrimaryPart == nil then
 		rig.PrimaryPart = hrp
 	end
-	for _, name in { "LeftArm", "RightArm" } do
-		local limb, created = slot(rig, name, hrp.CFrame * ARM_OFFSET[name], report)
+	for _, arm in ARMS do
+		local limb, created = slot(rig, arm.name, hrp.CFrame * arm.offset, report)
 		if created then
 			link("Motor6D", hrp, hrp, limb)
 		end
 	end
-	local right = childPart(rig, "RightArm") :: BasePart
-	if right:FindFirstChild("GripAttachment") == nil then
-		local attachment = Instance.new("Attachment")
-		attachment.Name = "GripAttachment"
-		attachment.Parent = right
-		note(report, "GripAttachment")
-	end
-	local controller = rig:FindFirstChildWhichIsA("AnimationController", true)
-	if controller == nil then
-		controller = Instance.new("AnimationController")
-		controller.Parent = rig
-		note(report, "AnimationController")
-	end
-	if controller:FindFirstChildWhichIsA("Animator", true) == nil then
+	if rig:FindFirstChildWhichIsA("Animator", true) == nil then
+		local controller = rig:FindFirstChildWhichIsA("AnimationController", true)
+		if controller == nil then
+			controller = Instance.new("AnimationController")
+			controller.Parent = rig
+			note(report, "AnimationController")
+		end
 		Instance.new("Animator").Parent = controller
 		note(report, "Animator")
 	end
@@ -135,17 +137,28 @@ local function barrelC1(grip: BasePart, aim: BasePart, fire: BasePart, attachmen
 	return CFrame.lookAt(Vector3.zero, localForward, upHint) * (attachment.CFrame - attachment.CFrame.Position)
 end
 local function joinGun(rig: Model, gun: Model)
-	local right = childPart(rig, "RightArm") :: BasePart
+	local right = childPart(rig, RIGHT_ARM_NAME) :: BasePart
 	local grip = childPart(gun, "Grip") :: BasePart
-	local attachment = right:FindFirstChild("GripAttachment") :: Attachment
+	local motor = findGripMotor(rig, right)
 	gun.Parent = rig
-	local motor = Instance.new("Motor6D")
-	motor.Name = "Grip"
-	motor.Part0 = right
-	motor.Part1 = grip
-	motor.C0 = attachment.CFrame
-	motor.C1 = barrelC1(grip, childPart(gun, "AimPart") :: BasePart, childPart(gun, "FirePart") :: BasePart, attachment)
-	motor.Parent = right
+	if motor ~= nil then
+		motor.Part1 = grip
+		return
+	end
+	local attachment = right:FindFirstChild("GripAttachment") :: Attachment?
+	if attachment == nil then
+		attachment = Instance.new("Attachment")
+		attachment.Name = "GripAttachment"
+		attachment.Parent = right
+	end
+	local created = Instance.new("Motor6D")
+	created.Name = "Grip"
+	created.Part0 = right
+	created.Part1 = grip
+	created.C0 = attachment.CFrame
+	created.C1 =
+		barrelC1(grip, childPart(gun, "AimPart") :: BasePart, childPart(gun, "FirePart") :: BasePart, attachment)
+	created.Parent = right
 end
 function ViewmodelRig.build(gunName: string): Model
 	local missing = {}
@@ -194,14 +207,14 @@ function ViewmodelRig.validate(rig: Model): (boolean, string?)
 	if grip == nil or gun.PrimaryPart ~= grip then
 		return false, "Grip is not the gun PrimaryPart"
 	end
-	local rows = {
-		{ rig, hrp, "LeftArm", hrp },
-		{ rig, hrp, "RightArm", hrp },
-		{ gun, grip, "Mag", grip },
-		{ gun, grip, "Bolt", grip },
-	}
-	for _, row in rows do
-		local problem = motorProblem(row[1], row[2], row[3], row[4])
+	for _, arm in ARMS do
+		local problem = motorProblem(rig, hrp, arm.name, hrp)
+		if problem ~= nil then
+			return false, problem
+		end
+	end
+	for _, name in { "Mag", "Bolt" } do
+		local problem = motorProblem(gun, grip, name, grip)
 		if problem ~= nil then
 			return false, problem
 		end
@@ -211,17 +224,12 @@ function ViewmodelRig.validate(rig: Model): (boolean, string?)
 			return false, `{name} is missing`
 		end
 	end
-	local right = childPart(rig, "RightArm") :: BasePart
-	local attachment = right:FindFirstChild("GripAttachment")
-	if attachment == nil or not attachment:IsA("Attachment") then
-		return false, "GripAttachment is missing"
-	end
-	local controller = rig:FindFirstChildWhichIsA("AnimationController", true)
-	if controller == nil or controller:FindFirstChildWhichIsA("Animator", true) == nil then
+	if rig:FindFirstChildWhichIsA("Animator", true) == nil then
 		return false, "Animator is missing"
 	end
-	local gripMotor = right:FindFirstChild("Grip")
-	if gripMotor == nil or not gripMotor:IsA("Motor6D") or gripMotor.Part0 ~= right or gripMotor.Part1 ~= grip then
+	local right = childPart(rig, RIGHT_ARM_NAME) :: BasePart
+	local gripMotor = findGripMotor(rig, right)
+	if gripMotor == nil or gripMotor.Part1 ~= grip then
 		return false, "Grip motor is missing"
 	end
 	local joined = {}
