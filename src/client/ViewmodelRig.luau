@@ -167,6 +167,19 @@ function ViewmodelRig.build(gunName: string): Model
 	if #missing > 0 then
 		warn(`ViewmodelRig: missing {table.concat(missing, ", ")}`)
 	end
+	for _, desc in ipairs(rig:GetDescendants()) do
+		if desc:IsA("BasePart") then
+			desc.CanCollide = false
+			desc.CanQuery = false
+			desc.CanTouch = false
+			desc.Massless = true
+			desc.CastShadow = false
+		elseif desc:IsA("Humanoid") then
+			desc.EvaluateStateMachine = false
+			desc.RequiresNeck = false
+			desc.BreakJointsOnDeath = false
+		end
+	end
 	return rig
 end
 local function gunOf(rig: Model): Model?
